@@ -1,0 +1,5 @@
+black
+commitizen
+flake8
+isort
+pre-commit

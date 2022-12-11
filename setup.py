@@ -1,10 +1,10 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='src',
+    name="src",
     packages=find_packages(),
-    version='0.1.0',
-    description='Android application that provides driver assistance via object detection',
-    author='Filipe Campos',
-    license='MIT',
+    version="0.1.0",
+    description="Android application that provides driver assistance via object detection",
+    author="Filipe Campos",
+    license="MIT",
 )

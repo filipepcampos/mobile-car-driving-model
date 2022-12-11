@@ -1,5 +1,3 @@
-from time import time
-
 import albumentations
 import objdetect as od
 import torch
@@ -13,10 +11,8 @@ from grid import (
 )
 from loguru import logger
 from torch.utils.data import DataLoader
-from torchvision.ops import sigmoid_focal_loss
 
 import data
-from models import create_split_mobilenetv3_small
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 EPOCHS = 500
@@ -92,8 +88,6 @@ kitti_transforms = create_transforms_kitti(
     albumentations.Compose(
         [
             albumentations.RandomCrop(width=IMG_SIZE[1], height=IMG_SIZE[0]),
-            albumentations.HorizontalFlip(p=0.5),
-            albumentations.RandomBrightnessContrast(),
         ],
         bbox_params=albumentations.BboxParams(
             format="albumentations",
@@ -111,8 +105,6 @@ gtsdb_transforms = create_transforms_gtsdb(
                 height=int(1360 / 3.312),
             ),  # Match kitti aspect ratio without distortion
             albumentations.Resize(width=IMG_SIZE[1], height=IMG_SIZE[0]),
-            albumentations.HorizontalFlip(p=0.5),
-            albumentations.RandomBrightnessContrast(),
         ],
         bbox_params=albumentations.BboxParams(
             format="albumentations",
@@ -121,88 +113,86 @@ gtsdb_transforms = create_transforms_gtsdb(
     ),
 )
 
+
+def precision(tp, fp, tn, fn):
+    return tp / (tp + fp)
+
+
+def recall(tp, fp, tn, fn):
+    return tp / (tp + fn)
+
+
+def accuracy(tp, fp, tn, fn):
+    return (tp + tn) / (tp + tn + fp + fn)
+
+
+def f1(tp, fp, tn, fn):
+    prec = precision(tp, fp, tn, fn)
+    rec = recall(tp, fp, tn, fn)
+    return 2 * (prec * rec) / (prec + rec)
+
+
+def log_metrics(tp, fp, tn, fn):
+    logger.info(f" accuracy: {accuracy(tp, fp, tn, fn)}")
+    logger.info(f" precision: {precision(tp, fp, tn, fn)}")
+    logger.info(f" recall: {recall(tp, fp, tn, fn)}")
+    logger.info(f" f1: {f1(tp, fp, tn, fn)}")
+
+
+def log_confusion_matrix(tp, fp, tn, fn):
+    logger.info("                   | Actual   | Actual   |")
+    logger.info("                   | Positive | Negative |")
+    logger.info(f"Predicted Positive | {tp : >8} | {fp : >8} |")
+    logger.info(f"Predicted Negative | {fn : >8} | {tn : >8} |")
+
+
+def test(tr, model, output_suffix=""):
+    model.eval()
+
+    # true positive, false positive, true negative, false negative
+    tp, fp, tn, fn = 0, 0, 0, 0
+
+    threshold = 0.5
+    for data_dict in tr:
+        datum = data_dict["image"].to(DEVICE)
+        preds = model(datum)
+        data_cuda = {name: data_dict[name].to(DEVICE) for name in data_dict.keys()}
+
+        true_scores = data_cuda[f"scores{output_suffix}"]
+        pred_scores = preds[f"scores{output_suffix}"] > threshold
+        tp += ((pred_scores == 1) & (true_scores == 1)).sum()
+        fp += ((pred_scores == 1) & (true_scores == 0)).sum()
+        tn += ((pred_scores == 0) & (true_scores == 0)).sum()
+        fn += ((pred_scores == 0) & (true_scores == 1)).sum()
+    return tp, fp, tn, fn
+
+
 # Creating dataset
 kitti_dataset = data.KITTIDetection("/data", "train", None, kitti_transforms)
 gtsdb_dataset = data.GTSDB("/data", None, gtsdb_transforms)
 
-tr = data.ConcatDataset(kitti_dataset, gtsdb_dataset)
-tr = DataLoader(tr, 32, True, num_workers=6, pin_memory=True)
-
-
 # Model creation
-model = create_split_mobilenetv3_small(N_CLASSES_KITTI, N_CLASSES_GTSDB)
+model = torch.load("../models/split_mobilenetv3_large.pth", map_location=DEVICE)
 model = model.to(DEVICE)
 
-weight_loss_fns = {
-    "scores_kitti": lambda data: data["id"],
-    "classes_kitti": lambda data: data["scores_kitti"],
-    "scores_gtsdb": lambda data: 1 - data["id"],
-    "classes_gtsdb": lambda data: data["scores_gtsdb"],
-}
-loss_fns = {
-    "scores_kitti": sigmoid_focal_loss,
-    "classes_kitti": torch.nn.CrossEntropyLoss(reduction="none"),
-    "scores_gtsdb": sigmoid_focal_loss,
-    "classes_gtsdb": torch.nn.CrossEntropyLoss(reduction="none"),
-}
-opt = torch.optim.Adam(model.parameters())
+logger.info("-- GTSDB --")
+tr = DataLoader(gtsdb_dataset, 32, True, num_workers=6, pin_memory=True)
+gtsdb_tp, gtsdb_fp, gtsdb_tn, gtsdb_fn = test(tr, model, "_gtsdb")
+log_confusion_matrix(gtsdb_tp, gtsdb_fp, gtsdb_tn, gtsdb_fn)
+log_metrics(gtsdb_tp, gtsdb_fp, gtsdb_tn, gtsdb_fn)
 
+logger.info("-- KITTI --")
+tr = DataLoader(kitti_dataset, 32, True, num_workers=6, pin_memory=True)
+kitti_tp, kitti_fp, kitti_tn, kitti_fn = test(tr, model, "_kitti")
+log_confusion_matrix(kitti_tp, kitti_fp, kitti_tn, kitti_fn)
+log_metrics(kitti_tp, kitti_fp, kitti_tn, kitti_fn)
 
-def train(tr, model, opt, weight_loss_fns, loss_fns, epochs, stop_condition=None):
-    """Trains the model.
-
-    `weight_loss_fns` and `loss_fns` are dictionaries, specifying
-    whether the loss should be applied to that grid location and what
-    loss to apply.
-    """
-    device = next(model.parameters()).device
-
-    # sanity-check: all losses must have reduction='none'
-    data = next(iter(tr))
-
-    preds = model(data["image"].to(device))
-    for name, func in loss_fns.items():
-        loss_value = func(preds[name], data[name].to(device))
-        assert len(loss_value.shape) > 0, f"Loss {name} must have reduction='none'"
-
-    model.train()
-    for epoch in range(epochs):
-        logger.info(f"* Epoch {epoch+1} / {epochs}")
-        tic = time()
-        avg_loss = 0
-        avg_losses = {name: 0 for name in loss_fns}
-        for data in tr:
-            datum = data["image"].to(device)
-            preds = model(datum)
-            data_cuda = {name: data[name].to(device) for name in loss_fns}
-            data_cuda["id"] = data["id"].to(
-                device,
-            )  # Add id even though it doesn't have loss
-
-            loss = 0
-            for name, func in loss_fns.items():
-                if name in weight_loss_fns:
-                    weight = weight_loss_fns[name](data_cuda)
-                    true_value = data_cuda[name]
-                    pred_value = preds[name]
-                    loss_value = (weight * func(pred_value, true_value)).mean()
-                    loss += loss_value
-                    avg_losses[name] += float(loss_value) / len(tr)
-
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
-            avg_loss += float(loss) / len(tr)
-        toc = time()
-        logger.info(
-            f"- {toc-tic:.1f}s - Avg loss: {avg_loss} - "
-            + " - ".join(f"{name} loss: {avg}" for name, avg in avg_losses.items()),
-        )
-        if stop_condition and stop_condition(avg_loss):
-            logger.info("Stopping due to criteria")
-            break
-
-
-logger.info(f"Training split {EPOCHS} epochs.")
-train(tr, model, opt, weight_loss_fns, loss_fns, EPOCHS, od.loop.StopPatience(10))
-torch.save(model, "../models/split.pth")
+logger.info("-- Combined --")
+tp, fp, tn, fn = (
+    gtsdb_tp + kitti_tp,
+    gtsdb_fp + kitti_fp,
+    gtsdb_tn + kitti_tn,
+    gtsdb_fn + kitti_fn,
+)
+log_confusion_matrix(tp, fp, tn, fn)
+log_metrics(tp, fp, tn, fn)

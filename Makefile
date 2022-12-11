@@ -1,20 +1,13 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data lint requirements sync_data_from_s3
 
 #################################################################################
 # GLOBALS                                                                       #
 #################################################################################
 
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-BUCKET = [OPTIONAL] your-bucket-for-syncing-data (do not include 's3://')
-PROFILE = default
+BUCKET = avg-kitti
 PROJECT_NAME = mobile_car_driving
 PYTHON_INTERPRETER = python3
-
-ifeq (,$(shell which conda))
-HAS_CONDA=False
-else
-HAS_CONDA=True
-endif
 
 #################################################################################
 # COMMANDS                                                                      #
@@ -40,33 +33,39 @@ lint:
 
 ## Download Data from S3
 sync_data_from_s3:
-ifeq (default,$(PROFILE))
-	aws s3 sync s3://$(BUCKET)/data/ data/
-else
-	aws s3 sync s3://$(BUCKET)/data/ data/ --profile $(PROFILE)
-endif
+	aws s3 sync s3://$(BUCKET) data/raw --exclude "*" --include "data_object_image_2.zip" --no-sign-request
+	unzip data/raw/data_object_image_2.zip -d data/processed/object
 
-## Set up python interpreter environment
-create_environment:
-ifeq (True,$(HAS_CONDA))
-		@echo ">>> Detected conda, creating conda environment."
-ifeq (3,$(findstring 3,$(PYTHON_INTERPRETER)))
-	conda create --name $(PROJECT_NAME) python=3
-else
-	conda create --name $(PROJECT_NAME) python=2.7
-endif
-		@echo ">>> New conda env created. Activate with:\nsource activate $(PROJECT_NAME)"
-else
-	$(PYTHON_INTERPRETER) -m pip install -q virtualenv virtualenvwrapper
-	@echo ">>> Installing virtualenvwrapper if not already installed.\nMake sure the following lines are in shell startup file\n\
-	export WORKON_HOME=$$HOME/.virtualenvs\nexport PROJECT_HOME=$$HOME/Devel\nsource /usr/local/bin/virtualenvwrapper.sh\n"
-	@bash -c "source `which virtualenvwrapper.sh`;mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER)"
-	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
-endif
+## Set up python interpreter environment for development
+build_env_dev:
+	$(PYTHON_INTERPRETER) -m venv .venv_dev && \
+	source .venv_dev/bin/activate && \
+	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt && \
+	$(PYTHON_INTERPRETER) -m pip install -r requirements_dev.txt
+
+## Set up python interpreter environment for production
+build_env_prod:
+	$(PYTHON_INTERPRETER) -m venv .venv_prod
+	source .venv_prod/bin/activate
+	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 
 ## Test python environment is setup correctly
 test_environment:
 	$(PYTHON_INTERPRETER) test_environment.py
+
+## Install pre-commit and git hooks
+install-pre-commit: build_env_dev
+	@source .venv_dev/bin/activate && \
+	pre-commit install --install-hooks -t pre-commit -t commit-msg && \
+	pre-commit autoupdate
+
+## Uninstall pre-commit and git hooks
+uninstall-pre-commit:
+	@source .venv_dev/bin/activate && \
+	pre-commit uninstall && \
+	pre-commit uninstall --hook-type pre-push && \
+	rm -rf .git/hooks/pre-commit
+
 
 #################################################################################
 # PROJECT RULES                                                                 #
