@@ -12,3 +12,4 @@ Sphinx
 torch
 torchaudio
 torchvision
+tqdm

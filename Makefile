@@ -34,9 +34,11 @@ lint:
 
 ## Download Data from S3
 get_data:
-#	aws s3 sync s3://$(BUCKET) data/raw --exclude "*" --include "data_object_image_2.zip" --no-sign-request
-#	unzip data/raw/data_object_image_2.zip -d data/raw/kitti
+	aws s3 sync s3://$(BUCKET) data/raw --exclude "*" --include "data_object_image_2.zip" --include "data_object_label_2.zip" --no-sign-request
+	unzip data/raw/data_object_image_2.zip -d data/raw/kitti
+	unzip data/raw/data_object_label_2.zip -d data/raw/kitti
 	curl $(GTSDB_DOWNLOAD_URL) -o data/raw/gtsdb.zip -C -
+	unzip data/raw/gtsdb.zip -d data/raw/gtsdb
 
 ## Set up python interpreter environment for development
 build_env_dev:

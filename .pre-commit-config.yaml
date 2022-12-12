@@ -78,7 +78,7 @@ repos:
     #         files: ^src/
     #         exclude: ^tests/
     #         args: [--ignore-missing-imports]
-    #         additional_dependencies: [types-all]
+    #         # additional_dependencies: [types-all]
     - repo: https://github.com/asottile/add-trailing-comma
       rev: v2.3.0
       hooks:

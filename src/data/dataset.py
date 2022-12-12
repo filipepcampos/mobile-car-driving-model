@@ -1,7 +1,11 @@
 import os
+from typing import Dict, Tuple
 
+import albumentations
+import numpy as np
 import torch
 from skimage.io import imread
+from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.io import read_image
 
@@ -17,16 +21,14 @@ class GTSDB(Dataset):
         41: "allowovertaking",
     }
 
-    gt_map = {}
+    gt_map: Dict[str, Tuple[Tensor, Tensor]] = {}
 
-    def __init__(self, root, img_transform, dict_transform, exclude_labels=None):
+    def __init__(self, root, exclude_labels=None):
         exclude_labels = {} if exclude_labels is None else exclude_labels
         self.labels = [label for label in self.labels if label not in exclude_labels]
-        self.root = os.path.join(root, "GTSDB", "TrainIJCNN2013")
+        self.root = os.path.join(root, "TrainIJCNN2013")
         self.files = os.listdir(self.root)
         self.files = [f for f in self.files if f.endswith(".ppm")]
-        self.img_transform = img_transform
-        self.dict_transform = dict_transform
         self.setup_gt_map()
         self.files = [
             f for f in self.files if f in self.gt_map
@@ -70,11 +72,7 @@ class GTSDB(Dataset):
         else:
             bboxes, classes = torch.empty(), torch.empty()
 
-        if self.img_transform:
-            image = self.img_transform(image)
-        datum = {"image": image, "bboxes": bboxes, "classes_gtsdb": classes}
-        if self.dict_transform:
-            datum = self.dict_transform(**datum)
+        datum = {"image": image, "bboxes": bboxes, "classes": classes}
         return datum
 
 
@@ -99,18 +97,14 @@ class KITTIDetection(Dataset):
         self,
         root,
         fold,
-        img_transform,
-        dict_transform,
         exclude_labels=None,
     ):
         assert fold in ("train",)
         exclude_labels = {"Misc", "DontCare"} if exclude_labels is None else {}
-        self.img_transform = img_transform
-        self.dict_transform = dict_transform
         self.original_labels = [
             label for label in self.original_labels if label not in exclude_labels
         ]
-        self.root = os.path.join(root, "kitti", "object", "training")
+        self.root = os.path.join(root, "training")
         self.files = os.listdir(os.path.join(self.root, "image_2"))
 
     def __len__(self):
@@ -155,12 +149,46 @@ class KITTIDetection(Dataset):
             dtype=torch.int64,
         )
 
-        if self.img_transform:
-            image = self.img_transform(image)
-        datum = {"image": image, "bboxes": bboxes, "classes_kitti": classes}
-        if self.dict_transform:
-            datum = self.dict_transform(**datum)
-        return datum
+        return {"image": image, "bboxes": bboxes, "classes": classes}
+
+
+class AugmentedKITTIDetection(KITTIDetection):
+    def __init__(
+        self,
+        root,
+        fold,
+        exclude_labels=None,
+    ):
+        super().__init__(root, fold, exclude_labels)
+        img_width, img_height = 1024, 256
+        self.transform = albumentations.Compose(
+            [
+                albumentations.RandomCrop(width=img_width, height=img_height),
+                albumentations.HorizontalFlip(p=0.5),
+                albumentations.RandomBrightnessContrast(),
+            ],
+            bbox_params=albumentations.BboxParams(
+                format="albumentations",
+                label_fields=["classes"],
+            ),
+        )
+
+    def __getitem__(self, i):
+        item = super().__getitem__(i)
+        image = np.array(
+            item["image"].permute(1, 2, 0),
+        )  # Albumentation uses an numpy array with [H,W,C]
+        transformed_data = self.transform(
+            image=image,
+            bboxes=item["bboxes"],
+            classes=item["classes"],
+        )
+        transformed_data["image"] = torch.tensor(transformed_data["image"]).permute(
+            2,
+            0,
+            1,
+        )
+        return transformed_data
 
 
 # Concat two datasets without any transformation
