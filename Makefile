@@ -6,6 +6,7 @@
 
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 BUCKET = avg-kitti
+GTSDB_DOWNLOAD_URL = https://sid.erda.dk/public/archives/ff17dc924eba88d5d01a807357d6614c/TrainIJCNN2013.zip
 PROJECT_NAME = mobile_car_driving
 PYTHON_INTERPRETER = python3
 
@@ -32,9 +33,10 @@ lint:
 	flake8 src
 
 ## Download Data from S3
-sync_data_from_s3:
-	aws s3 sync s3://$(BUCKET) data/raw --exclude "*" --include "data_object_image_2.zip" --no-sign-request
-	unzip data/raw/data_object_image_2.zip -d data/raw/object
+get_data:
+#	aws s3 sync s3://$(BUCKET) data/raw --exclude "*" --include "data_object_image_2.zip" --no-sign-request
+#	unzip data/raw/data_object_image_2.zip -d data/raw/kitti
+	curl $(GTSDB_DOWNLOAD_URL) -o data/raw/gtsdb.zip -C -
 
 ## Set up python interpreter environment for development
 build_env_dev:

@@ -3,7 +3,11 @@ Commands
 
 The Makefile contains the central entry points for common tasks related to this project.
 
-Syncing data to S3
+Getting Data
 ^^^^^^^^^^^^^^^^^^
 
-* `make sync_data_from_s3` will use `aws s3 sync` to recursively sync files from `s3://[OPTIONAL] your-bucket-for-syncing-data (do not include 's3://')/data/` to `data/`.
+* `make get_data` will automatically download the data necessary to run this project (KITTI and GTSDB datasets).
+
+
+Setting up dev environment
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

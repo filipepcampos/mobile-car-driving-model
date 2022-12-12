@@ -3,3 +3,4 @@ commitizen
 flake8
 isort
 pre-commit
+sphinxawesome-theme
