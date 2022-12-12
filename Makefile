@@ -39,6 +39,7 @@ get_data:
 	unzip data/raw/data_object_label_2.zip -d data/raw/kitti
 	curl $(GTSDB_DOWNLOAD_URL) -o data/raw/gtsdb.zip -C -
 	unzip data/raw/gtsdb.zip -d data/raw/gtsdb
+	rm data/raw/*.zip
 
 ## Set up python interpreter environment for development
 build_env_dev:
