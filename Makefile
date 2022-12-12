@@ -34,7 +34,7 @@ lint:
 ## Download Data from S3
 sync_data_from_s3:
 	aws s3 sync s3://$(BUCKET) data/raw --exclude "*" --include "data_object_image_2.zip" --no-sign-request
-	unzip data/raw/data_object_image_2.zip -d data/processed/object
+	unzip data/raw/data_object_image_2.zip -d data/raw/object
 
 ## Set up python interpreter environment for development
 build_env_dev:
