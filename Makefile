@@ -5,6 +5,7 @@
 #################################################################################
 
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+SHELL := /bin/bash
 BUCKET = avg-kitti
 GTSDB_DOWNLOAD_URL = https://sid.erda.dk/public/archives/ff17dc924eba88d5d01a807357d6614c/TrainIJCNN2013.zip
 PROJECT_NAME = mobile_car_driving
