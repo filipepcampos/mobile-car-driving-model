@@ -58,7 +58,7 @@ repos:
             name: check-merge-conflict
             description: Check for files that contain merge conflict strings
     - repo: https://github.com/pre-commit/pygrep-hooks
-      rev: v1.9.0
+      rev: v1.10.0
       hooks:
           - id: python-check-mock-methods
             name: check-mock-methods
@@ -80,7 +80,7 @@ repos:
     #         args: [--ignore-missing-imports]
     #         # additional_dependencies: [types-all]
     - repo: https://github.com/asottile/add-trailing-comma
-      rev: v2.3.0
+      rev: v2.4.0
       hooks:
           - id: add-trailing-comma
             name: add-trailing-comma
@@ -108,7 +108,7 @@ repos:
             name: black - consistent Python code formatting
             description: The uncompromising Python code formatter
     - repo: https://github.com/PyCQA/isort
-      rev: 5.10.1
+      rev: 5.11.4
       hooks:
           - id: isort
             name: isort - sort Python imports
@@ -121,7 +121,7 @@ repos:
             description: Automatically upgrade syntax for newer versions of the language
             args: [--py36-plus]
     - repo: https://github.com/jendrikseipp/vulture
-      rev: v2.6
+      rev: v2.7
       hooks:
           - id: vulture
             name: vulture - finds unused code in Python programs
@@ -130,7 +130,7 @@ repos:
 # Git
 ##########################################################################################
     - repo: https://github.com/commitizen-tools/commitizen
-      rev: v2.37.1
+      rev: v2.40.0
       hooks:
           - id: commitizen
             stages: [commit-msg]
@@ -148,7 +148,7 @@ repos:
               - mdformat-beautysh
             exclude: CHANGELOG.md
     - repo: https://github.com/myint/docformatter
-      rev: v1.5.0
+      rev: v1.6.0.rc1
       hooks:
           - id: docformatter
             name: docformatter - formats docstrings to follow PEP 257
