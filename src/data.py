@@ -1,13 +1,18 @@
 import os
-from typing import Dict, Tuple
+from typing import List, TypedDict
 
 import albumentations
 import numpy as np
 import torch
-from skimage.io import imread
-from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.io import read_image
+
+
+class KITTIDatum(TypedDict):
+    image: torch.Tensor
+    bboxes: List[torch.Tensor]
+    classes: List[torch.Tensor]
+
 
 class KITTIDetection(Dataset):
     """The [KITTI](http://www.cvlibs.net/datasets/kitti/) self-driving
@@ -28,9 +33,9 @@ class KITTIDetection(Dataset):
 
     def __init__(
         self,
-        root,
-        fold,
-        exclude_labels=None,
+        root: str,
+        fold: str,
+        exclude_labels: List[str] = None,
     ):
         assert fold in ("train",)
         exclude_labels = {"Misc", "DontCare"} if exclude_labels is None else {}
@@ -43,7 +48,7 @@ class KITTIDetection(Dataset):
     def __len__(self):
         return len(self.files)
 
-    def convert_label(self, label):
+    def convert_label(self, label: str) -> str:
         conversion_dict = {
             "Car": "Vehicle",
             "Cyclist": "Vehicle",
@@ -55,7 +60,7 @@ class KITTIDetection(Dataset):
         }
         return conversion_dict[label]
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> KITTIDatum:
         filename = self.files[i]
         image = read_image(os.path.join(self.root, "image_2", filename)) / 255
         lines = [
@@ -88,9 +93,9 @@ class KITTIDetection(Dataset):
 class AugmentedKITTIDetection(KITTIDetection):
     def __init__(
         self,
-        root,
-        fold,
-        exclude_labels=None,
+        root: str,
+        fold: str,
+        exclude_labels: List[str] = None,
     ):
         super().__init__(root, fold, exclude_labels)
         img_width, img_height = 1024, 256
@@ -106,7 +111,7 @@ class AugmentedKITTIDetection(KITTIDetection):
             ),
         )
 
-    def __getitem__(self, i):
+    def __getitem__(self, i: int) -> KITTIDatum:
         item = super().__getitem__(i)
         image = np.array(
             item["image"].permute(1, 2, 0),
