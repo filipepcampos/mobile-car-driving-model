@@ -45,7 +45,7 @@ class KITTIDetection(Dataset):
         self.root = os.path.join(root, "training")
         self.files = os.listdir(os.path.join(self.root, "image_2"))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.files)
 
     def convert_label(self, label: str) -> str:
