@@ -1,7 +1,10 @@
-# Mobile Car Driving
+# Mobile Car Driving - Model training and conversion
 
-Android application that provides driver assistance via computer vision developed using Pytorch (Mobile).
+This repository encompasses the model training and conversion part of the MCD project which is detailed below.
 
+## About MCD
+
+Mobile Car Driving is an Android application that provides driver assistance via computer vision developed using Pytorch (Mobile).
 The main challenge involved creating a model that was both performant enough to be capable of running in real time and that was compatible with the limited capabilities of Pytorch Mobile.
 
 ![alt text](images/screenshots.png)
